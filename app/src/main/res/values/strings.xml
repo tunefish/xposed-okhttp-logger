@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">RequestLogger</string>
+    <string name="xposed_description">Logs all requests made via okhttp (in non-obfuscated apps)</string>
+</resources>
