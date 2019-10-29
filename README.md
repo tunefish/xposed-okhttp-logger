@@ -4,7 +4,9 @@ This is a simple module for the [Xposed Framework](https://xposed.info) that log
 
 # Building
 Built with gradle and most recent version of Android SDK build tooks v29.0.0 (as of 2019/10):
+
 `./gradlew build`
+
 The module's only dependency is Xposed Bridge.
 Once installed, it should show up as `RequestLogger` in the Xposed Installer.
 
