@@ -3,12 +3,14 @@ This is a simple module for the [Xposed Framework](https://xposed.info) that log
 
 
 # Building
-Built with gradle and most recent version of Android SDK build tooks v29.0.0 (as of 2019/10):
+Built with gradle and most recent version of Android SDK build tooks v29.0.0 (as of 2019/10).
+To build, run the following command in the root directory of this repository:
 
 `./gradlew build`
 
-The module's only dependency is Xposed Bridge.
+The generated APK is in `RequestLogger/build/outputs/apk/<buildtype>/`.
 Once installed, it should show up as `RequestLogger` in the Xposed Installer.
+The module's only dependency is Xposed Bridge.
 
 Tested on an Android Oreo 8.0.0 virtual device (x86) with Xposed Framework v90-beta3.
 
