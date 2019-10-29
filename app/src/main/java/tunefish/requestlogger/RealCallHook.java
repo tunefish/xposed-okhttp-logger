@@ -21,7 +21,7 @@ public class RealCallHook extends XC_MethodHook {
             // Get the okhttp3.Request object form the RealCall object
             Object request = XposedHelpers.callMethod(param.thisObject, "request");
             if (request == null) {
-                XposedBridge.log("Got call but REQUEST is null");
+                XposedBridge.log("REQUESTLOGGER: Got call but REQUEST is null");
                 return;
             }
 
@@ -29,14 +29,13 @@ public class RealCallHook extends XC_MethodHook {
             Object url = XposedHelpers.getObjectField(request, "url");
 
             if (url == null) {
-                XposedBridge.log("Got call but URL is null");
+                XposedBridge.log("REQUESTLOGGER: Got call but URL is null");
                 return;
             }
-            XposedBridge.log("REQUEST: " + url);
 
             Application app = AndroidAppHelper.currentApplication();
             if (app == null) {
-                XposedBridge.log("Cannot get application context!");
+                XposedBridge.log("REQUESTLOGGER: Cannot get application context!");
                 return;
             }
 
@@ -47,7 +46,7 @@ public class RealCallHook extends XC_MethodHook {
             fos.close();
         } catch (Exception e) {
             // Log error and don't crash
-            XposedBridge.log("okhttp3 request could not be identified:");
+            XposedBridge.log("REQUESTLOGGER: okhttp3 request could not be identified:");
             XposedBridge.log(e);
         }
     }
