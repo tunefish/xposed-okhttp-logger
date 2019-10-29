@@ -9,15 +9,15 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
 public class RequestLogger implements IXposedHookLoadPackage {
     public void handleLoadPackage(final LoadPackageParam lpparam) {
+        // Only hook applications using OkHttp
         Class realCall = XposedHelpers.findClassIfExists("okhttp3.RealCall",
                                                          lpparam.classLoader);
         if (realCall != null) {
-            // Call.execute() is used to issue a synchronous request
+            // RealCall.execute() and RealCall.enqueue(Callback c) are used to
+            // issue synchronous requests (and asynchronous, respectively).
             XposedHelpers.findAndHookMethod(realCall,
                                             "execute",
                                             new RealCallHook());
-
-            // Call.enqueue(Callback c) is used to issue an asynchronous request
             XposedHelpers.findAndHookMethod(realCall,
                                             "enqueue",
                                             "okhttp3.Callback",

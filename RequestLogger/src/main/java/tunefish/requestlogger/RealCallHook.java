@@ -15,8 +15,7 @@ import de.robv.android.xposed.XposedHelpers;
 public class RealCallHook extends XC_MethodHook {
     @Override
     protected void beforeHookedMethod(MethodHookParam param) {
-        // Called whenever a okhttp3.Request object has been built and was
-        // scheduled to be executed (but has not been issued yet)
+        // Called whenever a okhttp3.RealCall object is executed or scheduled
         try {
             // Get the okhttp3.Request object form the RealCall object
             Object req = XposedHelpers.callMethod(param.thisObject, "request");
