@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'me.tatarka.retrolambda'
 
 android {
     compileSdkVersion 28
@@ -15,10 +16,15 @@ android {
             minifyEnabled false
         }
     }
+    compileOptions {
+        sourceCompatibility = 1.8
+        targetCompatibility = 1.8
+    }
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'io.herrmann:java-generator-functions:1.0'
 
     // Xposed Bridge + sources
     compileOnly 'de.robv.android.xposed:api:82'
