@@ -26,7 +26,7 @@ There are several points during the lifetime of a OkHttp request at which we can
  * Hook **`okhttp3.Response` constructor or `okhttp3.Builder` methods**: has the same effect as above option, but only logs when a request is finished (successfully or not). Further, similar to the first option, `okhttp3.Response` objects can be (re)created several times after a request has been issued, leading to duplicates.
 
 This module implements the 3rd option, hooking `okhttp3.RealCall.execute()` and `okhttp3.RealCall.enqueue(Callback c)` since it yields the most accurate results and no duplicates.
-It obtains the `okhttp3.Request` object from the issued call by calling `.request()` on the call.
+It obtains the `okhttp3.Request` object from the issued call by reading the call's `originalRequest` field.
 The URL of the request can then be read from the `url` field of the request object.
 
 All detected requests are logged with timestamps in a logfile `_requests.log` in the private storage of each application.
@@ -40,8 +40,13 @@ The implemented deobfuscator can identify obfuscated OkHttp code as follows:
  1. Enumerate all classes and interfaces of the root `okhttp3` package by generating the class names until we find one Xposed cannot find.
  In the tested OkHttp versions this was the case at `okhttp.ae`.
 
- 2. Identify the `okhttp3.Call` interface based on its factory interface subclass and this class' only method, which accepts some `okhttp3.*` class as parameter and creates an `okhttp3.Call` object.
+ 2. Identify the `okhttp3.Call` interface, depending on OkHttp version:
+
+    * newer ones: based on its factory interface subclass and this class' only method, which accepts some `okhttp3.*` class as parameter and creates an `okhttp3.Call` object.
  In the same step we can also identify the `okhttp3.Request` class and the `Call.request()`getter.
+
+    * old ones (< v2.7.1 from 01/2016):  based on signature of methods in the interface (taking one argument max, one method can throw an exception).
+ The `okhttp3.Request` class will be resolved later in step 6 when we know the `okhttp3.RealCall` class.
 
  3. Find the `okhttp3.Call.execute()` and `okhttp3.Call.enqueue(Callback c)` methods among the methods in the `Call` interface based on their signature.
 
@@ -49,7 +54,10 @@ The implemented deobfuscator can identify obfuscated OkHttp code as follows:
 
  5. Get the implementations of `execute()` and `enqueue(Callback c)` in `RealCall`, which have the same name as their abstract declaration in the `Call` interface.
 
- 6. Find the `okhttp3.HttpUrl` class based on one of its method's return type `java.net.URI`.
+ 6. (Old versions of OkHttp only: Find the `okhttp3.Request` class based on the fact it has no superclass and the field types in the `RealCall` class).
+ Then, find the `originalRequest` field of the `RealCall` class based on its type.
+
+ 7. Find the `okhttp3.HttpUrl` class based on one of its method's return type `java.net.URI`.
  No other class in the package uses this class. Given the `HttpUrl` class we can finally find the `url` field in `okhttp3.RealCall`.
  In order to reduce the number of classes we have to check, we can limit the search to all class types of the fields in `okhttp3.Request`.
  This means that we will only search `okhttp3.CacheControl`, `okhttp3.Headers`, `okhttp3.HttpUrl` and `okhttp3.RequestBody`.
