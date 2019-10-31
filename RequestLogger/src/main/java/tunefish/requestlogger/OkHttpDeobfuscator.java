@@ -16,12 +16,10 @@ class OkHttpDeobfuscator {
     private static class Step2Container {
         Class<?> callInterface;
         Class<?> requestClass;
-        Method requestGetter;
 
-        Step2Container(Class<?> callInterface, Class<?> requestClass, Method requestGetter) {
+        Step2Container(Class<?> callInterface, Class<?> requestClass) {
             this.callInterface = callInterface;
             this.requestClass = requestClass;
-            this.requestGetter = requestGetter;
         }
     }
 
@@ -32,17 +30,16 @@ class OkHttpDeobfuscator {
     }
 
     static class DeobfuscationResult {
-
         Method execute;
         Method enqueue;
         String urlField;
-        String requestGetter;
+        String requestField;
 
-        DeobfuscationResult(Method execute, Method enqueue, String urlField, String requestGetter) {
+        DeobfuscationResult(Method execute, Method enqueue, String urlField, String requestField) {
             this.execute = execute;
             this.enqueue = enqueue;
             this.urlField = urlField;
-            this.requestGetter = requestGetter;
+            this.requestField = requestField;
         }
     }
 
@@ -67,7 +64,6 @@ class OkHttpDeobfuscator {
         // Step two: find the okhttp3.Call interface, okhttp3.Request class
         // and okhttp3.Call.request() method
         Class<?> callInterface, requestClass;
-        Method requestGetter;
         try {
             Step2Container container = findCallInterface(interfaces);
 
@@ -76,7 +72,6 @@ class OkHttpDeobfuscator {
             }
             callInterface = container.callInterface;
             requestClass = container.requestClass;
-            requestGetter = container.requestGetter;
         } catch (DeobfExeption e) {
             Utils.log("Failed to find Call interface:", e);
             Utils.log(Utils.dumpClasses(interfaces));
@@ -110,7 +105,7 @@ class OkHttpDeobfuscator {
             }
         } catch (DeobfExeption e) {
             Utils.log("Failed to find RealCall class:", e);
-            Utils.log("Interface:\n%s\nClasses:\n%s",
+            Utils.log("Interfaces:\n%s\nClasses:\n%s",
                       Utils.dumpClass(callInterface),
                       Utils.dumpClasses(classes));
             return null;
@@ -124,13 +119,48 @@ class OkHttpDeobfuscator {
         } catch (NoSuchMethodException e) {
             Utils.log("Failed to find execute()/enqueue() implementations of RealCall class:", e);
             Utils.log("Guess for: execute(): %s, enqueue(): %s", executeMethod, enqueueMethod);
-            Utils.log("Call interface:\n%s\nRealClass class:\n%s",
+            Utils.log("Call interfaces:\n%s\nRealClass class:\n%s",
                       Utils.dumpClass(callInterface),
                       Utils.dumpClass(realCallClass));
             return null;
         }
 
-        // Step six: find the okhttp3.HttpUrl class
+        // Step six: (old versions of OkHttp only) find the okhttp3.Request class
+        // (any version) and then the request field in RealCall
+        Field requestField;
+        if (requestClass == null) {
+            try {
+                requestClass = findRequestClass(realCallClass);
+
+                if (requestClass == null) {
+                    throw new DeobfExeption("Found no matching Request class");
+                }
+            } catch (DeobfExeption e) {
+                Utils.log("Failed to find Request class:", e);
+                Utils.log("Guess for: RealCall: %s", realCallClass);
+                Utils.log("Interfaces:\n%s\nClasses:\n%s",
+                        Utils.dumpClass(callInterface),
+                        Utils.dumpClasses(classes));
+                return null;
+            }
+        }
+
+        try {
+            requestField = findRealCallRequestField(realCallClass, requestClass);
+
+            if (requestField == null) {
+                throw new DeobfExeption("Failed to find originalRequest field of RealCall class");
+            }
+        } catch (DeobfExeption e) {
+            Utils.log("Failed to find the originalRequest field of RealCall class:", e);
+            Utils.log("Guess for: RealCall: %s", realCallClass);
+            Utils.log("Request class:\n%s\nClasses:\n%s",
+                    Utils.dumpClass(requestClass),
+                    Utils.dumpClasses(classes));
+            return null;
+        }
+
+        // Step seven: find the okhttp3.HttpUrl class
         Field urlField;
         try {
             urlField = findRequestUrlField(requestClass, classes);
@@ -140,6 +170,7 @@ class OkHttpDeobfuscator {
             }
         } catch (DeobfExeption e) {
             Utils.log("Failed to find the url field of Request class:", e);
+            Utils.log("Guess for: Request: %s", requestClass);
             Utils.log("Request class:\n%s\nClasses:\n%s",
                       Utils.dumpClass(requestClass),
                       Utils.dumpClasses(classes));
@@ -150,7 +181,7 @@ class OkHttpDeobfuscator {
                 executeMethod,
                 enqueueMethod,
                 urlField.getName(),
-                requestGetter.getName());
+                requestField.getName());
     }
 
     // =============================================================================================
@@ -246,14 +277,43 @@ class OkHttpDeobfuscator {
 
             if (reqGetter != null) {
                 if (container == null) {
-                    container = new Step2Container(nterface,
-                                                   potentialReqClass,
-                                                   reqGetter);
+                    container = new Step2Container(nterface, potentialReqClass);
                 } else {
                     throw new DeobfExeption(String.format(
                             "Multiple potential matches for Call interface: %s and %s",
                             container.callInterface,
                             nterface));
+                }
+            }
+        }
+
+        if (container == null) {
+            // we're probably looking at an old version of OkHttp, where the Call interface has
+            // no Factory sub-interface and no getter for the Request
+            for (Class nterface : interfaces) {
+                if (nterface.getDeclaredClasses().length > 0) {
+                    continue;
+                }
+
+                int methodThrowsException = 0;
+                boolean takesMaxOneParam = true;
+                boolean takesInterfaceAsParam = false;
+                for (Method m : nterface.getMethods()) {
+                    methodThrowsException+= m.getExceptionTypes().length > 0 ? 1:0;
+                    Class<?>[] params = m.getParameterTypes();
+                    takesMaxOneParam&= params.length <= 1;
+                    takesInterfaceAsParam|= params.length == 1 && interfaces.contains(params[0]);
+                }
+
+                if (methodThrowsException == 1 && takesMaxOneParam && takesInterfaceAsParam) {
+                    if (container == null) {
+                        container = new Step2Container(nterface, null);
+                    } else {
+                        throw new DeobfExeption(String.format(
+                                "Multiple potential matches for Call interface: %s and %s",
+                                container.callInterface,
+                                nterface));
+                    }
                 }
             }
         }
@@ -373,7 +433,57 @@ class OkHttpDeobfuscator {
     }
 
     // =============================================================================================
-    // Step 6 utils: finding the url field of okhttp3.Request and the okhttp3.HttpUrl class
+    // Step 6 utils: finding okhttp3.Request (if this is an old version of OkHttp)
+    // and then the field okhttp3.RealCall.originalRequest
+    // =============================================================================================
+
+    private static Class<?> findRequestClass(Class<?> realCallClass)
+            throws DeobfExeption {
+        Class<?> potentialRequestClass = null;
+
+        for (Field field : realCallClass.getDeclaredFields()) {
+            Class<?> clazz = field.getType();
+            if (clazz.isInterface() || clazz.getSuperclass() != null) {
+                continue;
+            }
+
+            if (potentialRequestClass == null) {
+                potentialRequestClass = clazz;
+            } else {
+                throw new DeobfExeption(String.format(
+                        "Multiple potential matches for okhttp3.Request: %s and %s",
+                        potentialRequestClass,
+                        clazz));
+            }
+        }
+
+        return potentialRequestClass;
+    }
+
+    private static Field findRealCallRequestField(Class<?> realCallClass, Class<?> requestClass)
+            throws DeobfExeption {
+        Field requestField = null;
+
+        for (Field field : realCallClass.getDeclaredFields()) {
+            if (field.getType() != requestClass) {
+                continue;
+            }
+
+            if (requestField == null) {
+                requestField = field;
+            } else {
+                throw new DeobfExeption(String.format(
+                        "Multiple potential matches for okhttp3.RealCall.originalRequest: %s and %s",
+                        requestField,
+                        field));
+            }
+        }
+
+        return requestField;
+    }
+
+    // =============================================================================================
+    // Step 7 utils: finding the url field of okhttp3.Request and the okhttp3.HttpUrl class
     // =============================================================================================
 
     private static Field findRequestUrlField(Class<?> requestClass, List<Class<?>> classes)

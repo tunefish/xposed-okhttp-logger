@@ -34,9 +34,9 @@ public class LoggerHookInstaller implements IXposedHookLoadPackage {
             }
 
             XposedBridge.hookMethod(
-                    result.execute, new RealCallHook(result.requestGetter, result.urlField));
+                    result.execute, new RealCallHook(result.requestField, result.urlField));
             XposedBridge.hookMethod(
-                    result.enqueue, new RealCallHook(result.requestGetter, result.urlField));
+                    result.enqueue, new RealCallHook(result.requestField, result.urlField));
             Utils.log("REQUESTLOGGER: Hooked %s, %s", result.execute, result.enqueue);
         }
     }

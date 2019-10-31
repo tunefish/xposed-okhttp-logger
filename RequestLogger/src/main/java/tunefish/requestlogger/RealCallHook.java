@@ -15,18 +15,18 @@ import de.robv.android.xposed.XposedHelpers;
 public class RealCallHook extends XC_MethodHook {
     // The name of the getter function in okhttp3.Call which returns
     // the associated Request object
-    private String reqGetter;
+    private String request;
 
     // The name of the URL field in okhttp3.Request
     private String url;
 
     RealCallHook() {
         // default values in unobfuscated OkHttp
-        this("request", "url");
+        this("originalRequest", "url");
     }
 
-    RealCallHook(String reqGetter, String url) {
-        this.reqGetter = reqGetter;
+    RealCallHook(String request, String url) {
+        this.request = request;
         this.url = url;
     }
 
@@ -35,7 +35,7 @@ public class RealCallHook extends XC_MethodHook {
         // Called whenever a okhttp3.RealCall object is executed or scheduled
         try {
             // Get the okhttp3.Request object form the RealCall object
-            Object req = XposedHelpers.callMethod(param.thisObject, reqGetter);
+            Object req = XposedHelpers.getObjectField(param.thisObject,this.request);
             if (req == null) {
                 XposedBridge.log("REQUESTLOGGER: Request is null");
                 return;
